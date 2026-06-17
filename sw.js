@@ -1,4 +1,4 @@
-const CACHE = 'clearstream-v11';
+const CACHE = 'clearstream-v12';
 const MEDIA_CACHE = 'clearstream-media-v4';
 const ASSETS = [
   '/',

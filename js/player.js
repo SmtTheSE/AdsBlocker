@@ -10,25 +10,7 @@ function mediaProxyUrl(videoId, musicMode) {
   return `${base}/api/media?videoId=${encodeURIComponent(videoId)}&audio=${musicMode ? 1 : 0}`;
 }
 
-async function probeMediaSrc(url) {
-  const res = await fetch(url, {
-    headers: { Range: 'bytes=0-0' },
-    signal: AbortSignal.timeout(90000),
-  });
-  const ct = res.headers.get('content-type') || '';
-  if (!res.ok || ct.includes('application/json')) {
-    let msg = `Media server error (${res.status})`;
-    try {
-      const json = await res.json();
-      if (json.error) msg = json.error;
-    } catch {
-      // ignore
-    }
-    throw new Error(msg);
-  }
-}
-
-function waitForMedia(el, timeoutMs = 45000) {
+function waitForMedia(el, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
       resolve();
@@ -49,7 +31,7 @@ function waitForMedia(el, timeoutMs = 45000) {
       cleanup();
       const code = el.error?.code;
       const msg = code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
-        ? 'Format not supported by your browser'
+        ? 'Format not supported — try Video mode or another track'
         : (el.error?.message || 'Could not load stream');
       reject(new Error(msg));
     };
@@ -67,36 +49,46 @@ function waitForMedia(el, timeoutMs = 45000) {
   });
 }
 
-export function createPlayer(videoEl) {
+export function createPlayer(videoEl, audioEl) {
   let onEnded = null;
   let onTimeUpdate = null;
   let musicMode = false;
   let currentVideoId = null;
 
-  videoEl.addEventListener('ended', () => {
-    if (onEnded) onEnded();
-  });
+  function activeEl() {
+    return musicMode ? audioEl : videoEl;
+  }
 
-  videoEl.addEventListener('timeupdate', () => {
-    if (onTimeUpdate) onTimeUpdate();
-  });
+  function idleEl() {
+    return musicMode ? videoEl : audioEl;
+  }
 
-  videoEl.addEventListener('loadedmetadata', () => {
-    if (onTimeUpdate) onTimeUpdate();
-  });
+  function bindMediaEvents(el) {
+    el.addEventListener('ended', () => {
+      if (el === activeEl() && onEnded) onEnded();
+    });
+    el.addEventListener('timeupdate', () => {
+      if (el === activeEl() && onTimeUpdate) onTimeUpdate();
+    });
+    el.addEventListener('loadedmetadata', () => {
+      if (el === activeEl() && onTimeUpdate) onTimeUpdate();
+    });
+    el.addEventListener('durationchange', () => {
+      if (el === activeEl() && onTimeUpdate) onTimeUpdate();
+    });
+    el.addEventListener('error', () => {
+      if (el !== activeEl()) return;
+      const err = el.error;
+      if (err) console.warn('Playback error', err.code, err.message);
+    });
+  }
 
-  videoEl.addEventListener('durationchange', () => {
-    if (onTimeUpdate) onTimeUpdate();
-  });
-
-  videoEl.addEventListener('error', () => {
-    const err = videoEl.error;
-    if (err) console.warn('Playback error', err.code, err.message);
-  });
+  bindMediaEvents(videoEl);
+  bindMediaEvents(audioEl);
 
   return {
     getActive() {
-      return videoEl;
+      return activeEl();
     },
 
     set onEnded(cb) {
@@ -111,6 +103,12 @@ export function createPlayer(videoEl) {
       musicMode = music;
       currentVideoId = videoId;
 
+      const other = idleEl();
+      other.pause();
+      other.removeAttribute('src');
+      other.load();
+
+      const el = activeEl();
       const streams = music
         ? streamData.audioStreams || []
         : [...(streamData.videoStreams || []), ...(streamData.audioStreams || [])];
@@ -124,11 +122,10 @@ export function createPlayer(videoEl) {
 
       if (mustProxy && videoId) {
         const src = mediaProxyUrl(videoId, music);
-        await probeMediaSrc(src);
-        videoEl.src = src;
-        videoEl.poster = streamData.thumbnailUrl || '';
-        videoEl.load();
-        await waitForMedia(videoEl);
+        el.src = src;
+        el.poster = streamData.thumbnailUrl || '';
+        el.load();
+        await waitForMedia(el);
         return { proxied: true };
       }
 
@@ -136,16 +133,17 @@ export function createPlayer(videoEl) {
         throw new Error('No playable stream found');
       }
 
-      videoEl.src = stream.url;
-      videoEl.poster = streamData.thumbnailUrl || '';
-      videoEl.load();
-      await waitForMedia(videoEl);
+      el.src = stream.url;
+      if (!music) el.poster = streamData.thumbnailUrl || '';
+      el.load();
+      await waitForMedia(el);
       return stream;
     },
 
     async play() {
+      const el = activeEl();
       try {
-        await videoEl.play();
+        await el.play();
       } catch (err) {
         if (err?.name === 'NotSupportedError') {
           throw new Error('Playback not supported — try another track or switch to Video mode');
@@ -155,50 +153,52 @@ export function createPlayer(videoEl) {
     },
 
     pause() {
-      videoEl.pause();
+      activeEl().pause();
     },
 
     toggle() {
-      if (videoEl.paused) return this.play();
+      if (activeEl().paused) return this.play();
       this.pause();
     },
 
     seek(seconds) {
+      const el = activeEl();
       if (!Number.isFinite(seconds)) return false;
-      const duration = videoEl.duration;
+      const duration = el.duration;
       const max = Number.isFinite(duration) && duration > 0 ? duration : seconds;
       const next = Math.max(0, Math.min(seconds, max));
 
-      if (videoEl.seekable?.length) {
-        const start = videoEl.seekable.start(0);
-        const end = videoEl.seekable.end(videoEl.seekable.length - 1);
+      if (el.seekable?.length) {
+        const start = el.seekable.start(0);
+        const end = el.seekable.end(el.seekable.length - 1);
         if (next < start || next > end) return false;
       }
 
-      videoEl.currentTime = next;
+      el.currentTime = next;
       return true;
     },
 
     skipBy(deltaSeconds) {
-      return this.seek((videoEl.currentTime || 0) + deltaSeconds);
+      return this.seek((activeEl().currentTime || 0) + deltaSeconds);
     },
 
     getDuration() {
-      const d = videoEl.duration;
+      const d = activeEl().duration;
       return Number.isFinite(d) ? d : 0;
     },
 
     getCurrentTime() {
-      return videoEl.currentTime || 0;
+      return activeEl().currentTime || 0;
     },
 
     getSeekableEnd() {
-      if (!videoEl.seekable?.length) return this.getDuration();
-      return videoEl.seekable.end(videoEl.seekable.length - 1);
+      const el = activeEl();
+      if (!el.seekable?.length) return this.getDuration();
+      return el.seekable.end(el.seekable.length - 1);
     },
 
     isPaused() {
-      return videoEl.paused;
+      return activeEl().paused;
     },
 
     isMusicMode() {
@@ -210,9 +210,11 @@ export function createPlayer(videoEl) {
     },
 
     destroy() {
-      videoEl.pause();
-      videoEl.removeAttribute('src');
-      videoEl.load();
+      for (const el of [videoEl, audioEl]) {
+        el.pause();
+        el.removeAttribute('src');
+        el.load();
+      }
     },
   };
 }

@@ -1,5 +1,5 @@
 import { extractVideoId, formatDuration } from './config.js';
-import { getStreams, searchVideos, searchMusic, getActiveInstance, getActiveSource, detectServerless, wakeMediaBackend, isServerlessMode, getMediaBackendUrl } from './api.js';
+import { getStreams, searchVideos, searchMusic, getActiveInstance, getActiveSource, detectServerless, wakeMediaBackend, cacheTrackOnBackend, isServerlessMode, getMediaBackendUrl } from './api.js';
 import * as queue from './queue.js';
 import { createPlayer } from './player.js';
 import { initInstallUI, parseIncomingLink, initMediaSession, isStandalone } from './install.js';
@@ -25,6 +25,7 @@ const els = {
   emptyState: $('#empty-state'),
   activePlayer: $('#active-player'),
   video: $('#video-el'),
+  audio: $('#audio-el'),
   musicVisual: $('#music-visual'),
   musicArt: $('#music-art'),
   trackTitle: $('#track-title'),
@@ -46,7 +47,7 @@ const els = {
   toast: $('#toast'),
 };
 
-const player = createPlayer(els.video);
+const player = createPlayer(els.video, els.audio);
 let musicMode = true;
 let currentMeta = null;
 let loading = false;
@@ -286,6 +287,8 @@ async function loadAndPlay(item, { addToQueueFirst = false, queueRest = false, r
     if (isServerlessMode() && getMediaBackendUrl()) {
       setStatus('loading', 'Starting media server…');
       await wakeMediaBackend();
+      setStatus('loading', 'Caching track…');
+      await cacheTrackOnBackend(item.id, musicMode);
     } else if (isServerlessMode() && !getMediaBackendUrl()) {
       throw new Error('Set MEDIA_BACKEND_URL on Vercel to your Render URL (see DEPLOY.md)');
     }
@@ -491,8 +494,10 @@ els.btnQueueAdd.addEventListener('click', () => {
   renderQueue();
 });
 
-els.video.addEventListener('play', () => { updateTransport(); persistSession(true); });
-els.video.addEventListener('pause', () => { updateTransport(); persistSession(false); });
+for (const mediaEl of [els.video, els.audio]) {
+  mediaEl.addEventListener('play', () => { updateTransport(); persistSession(true); });
+  mediaEl.addEventListener('pause', () => { updateTransport(); persistSession(false); });
+}
 
 player.onTimeUpdate = updateSeekBar;
 

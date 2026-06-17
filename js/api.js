@@ -52,6 +52,17 @@ export async function wakeMediaBackend() {
   }
 }
 
+export async function cacheTrackOnBackend(videoId, musicMode = true) {
+  const base = mediaBackendUrl?.replace(/\/$/, '');
+  if (!base) return;
+  const url = `${base}/api/cache/warm?videoId=${encodeURIComponent(videoId)}&audio=${musicMode ? 1 : 0}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(300000) });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(body.error || `Cache failed (${res.status})`);
+  }
+}
+
 export function getActiveInstance() {
   return activeInstance;
 }
