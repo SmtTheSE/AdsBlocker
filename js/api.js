@@ -3,6 +3,7 @@ import { PROXY_STREAMS } from './config.js';
 let activeInstance = null;
 let activeSource = null;
 let serverlessMode = null;
+let mediaBackendUrl = null;
 
 async function fetchProxy(params) {
   const qs = new URLSearchParams(params).toString();
@@ -21,9 +22,10 @@ async function fetchProxy(params) {
 export async function detectServerless() {
   if (serverlessMode != null) return serverlessMode;
   try {
-    const res = await fetch('/api/health', { signal: AbortSignal.timeout(5000) });
+    const res = await fetch('/api/health', { signal: AbortSignal.timeout(8000) });
     const data = await res.json();
     serverlessMode = !data?.features?.diskCache;
+    mediaBackendUrl = data?.mediaBackendUrl || null;
     return serverlessMode;
   } catch {
     serverlessMode = false;
@@ -33,6 +35,21 @@ export async function detectServerless() {
 
 export function isServerlessMode() {
   return serverlessMode === true;
+}
+
+export function getMediaBackendUrl() {
+  return mediaBackendUrl;
+}
+
+export async function wakeMediaBackend() {
+  const base = mediaBackendUrl?.replace(/\/$/, '');
+  if (!base) return false;
+  try {
+    const res = await fetch(`${base}/api/health`, { signal: AbortSignal.timeout(90000) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function getActiveInstance() {

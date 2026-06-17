@@ -25,14 +25,17 @@ The container installs the **latest yt-dlp** release (not Debian’s old package
 ## Option B — Vercel frontend + media backend
 
 1. Deploy this repo with **Docker** to Railway/Render (Option A).
-2. Copy your backend URL, e.g. `https://clearstream-api.up.railway.app`
+2. Copy your backend URL, e.g. `https://adsblocker-cqaa.onrender.com`
 3. In **Vercel** → Project → Settings → Environment Variables, add:
 
 | Name | Value |
 |------|-------|
-| `MEDIA_BACKEND_URL` | `https://your-railway-app.up.railway.app` |
+| `MEDIA_BACKEND_URL` | `https://adsblocker-cqaa.onrender.com` |
 
-4. Redeploy Vercel.
+4. **Redeploy Vercel** (required — env vars only apply after redeploy).
+5. Open your site → DevTools → Network → `/api/health` should show `"mediaBackendUrl":"https://..."`.
+
+Without `MEDIA_BACKEND_URL`, playback on Vercel will always 502.
 
 Vercel will serve the UI + search/metadata APIs. `/api/media` forwards to your Docker backend for actual playback.
 

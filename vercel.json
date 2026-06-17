@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
+    "api/media.js": {
+      "maxDuration": 60,
+      "includeFiles": "lib/**"
+    },
     "api/**/*.js": {
       "maxDuration": 10,
       "includeFiles": "lib/**"

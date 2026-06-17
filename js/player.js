@@ -1,11 +1,31 @@
 import { pickBestStream } from './config.js';
+import { getMediaBackendUrl } from './api.js';
 
 function isGoogleCdn(url) {
   return url && (url.includes('googlevideo.com') || url.includes('youtube.com/videoplayback'));
 }
 
 function mediaProxyUrl(videoId, musicMode) {
-  return `/api/media?videoId=${encodeURIComponent(videoId)}&audio=${musicMode ? 1 : 0}`;
+  const base = getMediaBackendUrl() || '';
+  return `${base}/api/media?videoId=${encodeURIComponent(videoId)}&audio=${musicMode ? 1 : 0}`;
+}
+
+async function probeMediaSrc(url) {
+  const res = await fetch(url, {
+    headers: { Range: 'bytes=0-0' },
+    signal: AbortSignal.timeout(90000),
+  });
+  const ct = res.headers.get('content-type') || '';
+  if (!res.ok || ct.includes('application/json')) {
+    let msg = `Media server error (${res.status})`;
+    try {
+      const json = await res.json();
+      if (json.error) msg = json.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
+  }
 }
 
 function waitForMedia(el, timeoutMs = 45000) {
@@ -103,7 +123,9 @@ export function createPlayer(videoEl) {
         isGoogleCdn(stream?.url);
 
       if (mustProxy && videoId) {
-        videoEl.src = mediaProxyUrl(videoId, music);
+        const src = mediaProxyUrl(videoId, music);
+        await probeMediaSrc(src);
+        videoEl.src = src;
         videoEl.poster = streamData.thumbnailUrl || '';
         videoEl.load();
         await waitForMedia(videoEl);

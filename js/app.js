@@ -1,5 +1,5 @@
 import { extractVideoId, formatDuration } from './config.js';
-import { getStreams, searchVideos, searchMusic, getActiveInstance, getActiveSource, detectServerless } from './api.js';
+import { getStreams, searchVideos, searchMusic, getActiveInstance, getActiveSource, detectServerless, wakeMediaBackend, isServerlessMode, getMediaBackendUrl } from './api.js';
 import * as queue from './queue.js';
 import { createPlayer } from './player.js';
 import { initInstallUI, parseIncomingLink, initMediaSession, isStandalone } from './install.js';
@@ -249,6 +249,7 @@ async function loadAndPlay(item, { addToQueueFirst = false, queueRest = false, r
   setStatus('loading', 'Loading stream…');
 
   try {
+    await detectServerless();
     if (addToQueueFirst) queue.addToQueue(item);
     else queue.playNow(item);
 
@@ -282,6 +283,13 @@ async function loadAndPlay(item, { addToQueueFirst = false, queueRest = false, r
       };
     }
 
+    if (isServerlessMode() && getMediaBackendUrl()) {
+      setStatus('loading', 'Starting media server…');
+      await wakeMediaBackend();
+    } else if (isServerlessMode() && !getMediaBackendUrl()) {
+      throw new Error('Set MEDIA_BACKEND_URL on Vercel to your Render URL (see DEPLOY.md)');
+    }
+
     currentMeta = {
       ...item,
       title: data.title || item.title,
@@ -310,9 +318,11 @@ async function loadAndPlay(item, { addToQueueFirst = false, queueRest = false, r
   } catch (err) {
     setStatus('error', 'Failed to load');
     const msg = err.message || 'Could not play — try another track';
-    const hint = msg.includes('MEDIA_BACKEND_URL')
-      ? 'Set MEDIA_BACKEND_URL on Vercel to your Docker backend (see DEPLOY.md)'
-      : msg;
+    const hint = msg.includes('MEDIA_BACKEND_URL') || (!getMediaBackendUrl() && isServerlessMode())
+      ? 'Set MEDIA_BACKEND_URL on Vercel to https://adsblocker-cqaa.onrender.com then redeploy'
+      : msg.includes('waking') || msg.includes('timed out')
+        ? 'Media server is waking up — wait 30s and try again'
+        : msg;
     toast(hint);
     console.error('Playback failed:', err);
     persistSession(false);
