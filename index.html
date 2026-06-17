@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>ClearStream Shield — Ad Block VPN</title>
+  <meta name="description" content="Tap to connect. Block ads on YouTube and Music — continuous playback, one song after another.">
+  <meta name="theme-color" content="#0a0a0f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ClearStream">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/icon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-shield="off">
+  <!-- VPN-style connect screen -->
+  <section class="shield-screen" id="shield-screen">
+    <div class="shield-screen__inner">
+      <p class="shield-brand">ClearStream Shield</p>
+
+      <div class="shield-ring-wrap">
+        <div class="shield-ring" id="shield-ring" aria-hidden="true">
+          <div class="shield-ring__pulse"></div>
+          <div class="shield-ring__icon">🛡</div>
+        </div>
+      </div>
+
+      <p class="shield-status-label" id="shield-status-label">Not connected</p>
+      <h1 class="shield-title">Tap to block ads on<br>YouTube &amp; Music</h1>
+      <p class="shield-desc">Connects your stream shield — ad-free playback with auto-play queue, one song after another.</p>
+
+      <button type="button" class="shield-connect-btn" id="shield-connect">
+        <span class="shield-connect-btn__label">Connect</span>
+      </button>
+
+      <div class="shield-options">
+        <label class="shield-check">
+          <input type="checkbox" id="dns-shield-toggle">
+          <span>Also enable system DNS shield (blocks ads in other apps)</span>
+        </label>
+
+        <div class="dns-panel" id="dns-panel" hidden>
+          <p class="dns-panel__lead">Copy a DNS hostname → paste in phone settings:</p>
+          <div class="dns-providers">
+            <button type="button" class="dns-provider active" data-dns="adguard">AdGuard</button>
+            <button type="button" class="dns-provider" data-dns="nextdns">NextDNS</button>
+          </div>
+          <div class="dns-host-row">
+            <code id="dns-host">dns.adguard.com</code>
+            <button type="button" id="dns-copy" class="dns-copy">Copy</button>
+          </div>
+          <div class="dns-platform-steps" id="dns-platform-steps"></div>
+        </div>
+
+        <label class="shield-check">
+          <input type="checkbox" id="autoplay-toggle" checked>
+          <span>Auto-play next song (continuous music)</span>
+        </label>
+      </div>
+
+      <button type="button" class="shield-install-link" id="btn-open-setup">＋ Add to Home Screen</button>
+    </div>
+  </section>
+
+  <!-- Main app (visible when connected) -->
+  <div class="app-shell" id="app-shell" hidden>
+    <div class="app" data-mode="music">
+      <header class="topbar">
+        <button type="button" class="shield-disconnect" id="shield-disconnect" title="Disconnect">
+          <span class="shield-disconnect__dot"></span>
+          <span>Connected</span>
+        </button>
+
+        <form class="search" id="search-form" role="search">
+          <label class="sr-only" for="search-input">Search or paste URL</label>
+          <input id="search-input" type="search" placeholder="Search music / paste YouTube link…" autocomplete="off" spellcheck="false">
+          <button type="submit" class="search__btn" aria-label="Search">Go</button>
+        </form>
+
+        <div class="topbar__actions">
+          <button class="mode-toggle" id="mode-toggle" type="button" aria-pressed="true">
+            <span class="mode-toggle__video">Video</span>
+            <span class="mode-toggle__music">Music</span>
+          </button>
+          <button class="queue-toggle" id="queue-toggle" type="button" aria-expanded="false" aria-controls="queue-panel">
+            Queue <span class="queue-toggle__count" id="queue-count">0</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="layout">
+        <main class="stage">
+          <section class="player-shell" id="player-shell">
+            <div class="player-shell__empty" id="empty-state">
+              <p class="empty__shield-badge">🛡 Shield active</p>
+              <h2>Search or paste a link</h2>
+              <p>Songs play one after another automatically. Use Music mode for background listening.</p>
+              <div class="empty__chips">
+                <button type="button" class="chip" data-search="lofi hip hop radio">Start lofi radio</button>
+                <button type="button" class="chip" data-search="top hits 2025">Top hits</button>
+              </div>
+            </div>
+
+            <div class="player-shell__active" id="active-player" hidden>
+              <div class="media-frame" id="media-frame">
+                <video id="video-el" playsinline webkit-playsinline controls preload="metadata" poster=""></video>
+                <audio id="audio-el" preload="metadata"></audio>
+                <div class="music-visual" id="music-visual">
+                  <img id="music-art" alt="" width="320" height="320">
+                  <div class="music-visual__pulse" aria-hidden="true"></div>
+                </div>
+              </div>
+
+              <div class="now-playing">
+                <div class="now-playing__meta">
+                  <p class="now-playing__label">Now Playing · <span id="queue-remaining">0</span> up next</p>
+                  <h2 id="track-title">—</h2>
+                  <p id="track-author" class="now-playing__author">—</p>
+                </div>
+                <div class="seek-bar" id="seek-bar">
+                  <span class="seek-bar__time" id="time-current">0:00</span>
+                  <input type="range" id="seek-range" class="seek-bar__range" min="0" max="0" value="0" step="0.25" aria-label="Seek through track">
+                  <span class="seek-bar__time" id="time-duration">0:00</span>
+                </div>
+                <div class="transport">
+                  <button type="button" id="btn-prev" class="transport__btn" aria-label="Previous" disabled>⏮</button>
+                  <button type="button" id="btn-play" class="transport__btn transport__btn--main" aria-label="Play">▶</button>
+                  <button type="button" id="btn-next" class="transport__btn" aria-label="Next" disabled>⏭</button>
+                  <button type="button" id="btn-queue-add" class="transport__btn transport__btn--ghost" aria-label="Add to queue">＋</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="results" id="results-section" hidden>
+            <div class="results__header">
+              <h2 id="results-title">Results</h2>
+              <button type="button" class="text-btn" id="queue-all">Play all →</button>
+              <span class="results__count" id="results-count"></span>
+            </div>
+            <ul class="results__list" id="results-list" role="list"></ul>
+          </section>
+        </main>
+
+        <aside class="queue-panel" id="queue-panel" hidden>
+          <div class="queue-panel__head">
+            <h2>Up Next</h2>
+            <button type="button" id="queue-clear" class="text-btn">Clear</button>
+          </div>
+          <ul class="queue-list" id="queue-list" role="list"></ul>
+          <p class="queue-panel__empty" id="queue-empty">Search music — tracks auto-queue for continuous play</p>
+        </aside>
+      </div>
+
+      <footer class="statusbar">
+        <span class="statusbar__dot" id="status-dot" data-state="idle"></span>
+        <span id="status-text">Shield active</span>
+        <span class="statusbar__sep">·</span>
+        <span id="instance-text">—</span>
+      </footer>
+    </div>
+  </div>
+
+  <div class="setup-modal" id="setup-modal" hidden role="dialog" aria-modal="true" aria-labelledby="setup-title">
+    <div class="setup-modal__backdrop" id="setup-close"></div>
+    <div class="setup-modal__panel">
+      <h2 id="setup-title">Add to Home Screen</h2>
+      <p class="setup-modal__lead">Install like a VPN app — one tap from your home screen to connect.</p>
+      <div id="setup-ios" class="setup-steps">
+        <h3>iPhone</h3>
+        <ol>
+          <li>Safari → <strong>Share</strong> → <strong>Add to Home Screen</strong></li>
+          <li>Open ClearStream → tap <strong>Connect</strong></li>
+        </ol>
+      </div>
+      <div id="setup-android" class="setup-steps" hidden>
+        <h3>Android</h3>
+        <ol>
+          <li>Chrome menu → <strong>Install app</strong></li>
+          <li>Open ClearStream → tap <strong>Connect</strong></li>
+        </ol>
+      </div>
+      <button type="button" class="btn-primary setup-modal__done" id="setup-done">Got it</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

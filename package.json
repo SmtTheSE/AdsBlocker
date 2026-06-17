@@ -1,0 +1,16 @@
+{
+  "name": "clearstream",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ad-free YouTube and music streaming web app",
+  "scripts": {
+    "dev": "node scripts/dev-server.mjs",
+    "start": "node scripts/dev-server.mjs",
+    "build": "echo 'Static deploy — API routes run as serverless functions'",
+    "deploy": "vercel --prod"
+  },
+  "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
+    "youtubei.js": "^17.0.1"
+  }
+}
