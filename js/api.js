@@ -1,4 +1,4 @@
-import { PROXY_STREAMS } from './config.js';
+import { PROXY_STREAMS, DEFAULT_MEDIA_BACKEND } from './config.js';
 
 let activeInstance = null;
 let activeSource = null;
@@ -20,16 +20,17 @@ async function fetchProxy(params) {
 }
 
 export async function detectServerless() {
-  if (serverlessMode != null) return serverlessMode;
   try {
-    const res = await fetch('/api/health', { signal: AbortSignal.timeout(8000) });
+    const res = await fetch('/api/health', { signal: AbortSignal.timeout(8000), cache: 'no-store' });
     const data = await res.json();
     serverlessMode = !data?.features?.diskCache;
-    mediaBackendUrl = data?.mediaBackendUrl || null;
+    mediaBackendUrl = data?.mediaBackendUrl
+      || (serverlessMode ? DEFAULT_MEDIA_BACKEND : null);
     return serverlessMode;
   } catch {
-    serverlessMode = false;
-    return false;
+    serverlessMode = location.hostname.includes('vercel.app');
+    mediaBackendUrl = serverlessMode ? DEFAULT_MEDIA_BACKEND : null;
+    return serverlessMode;
   }
 }
 

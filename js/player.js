@@ -10,6 +10,47 @@ function mediaProxyUrl(videoId, musicMode) {
   return `${base}/api/media?videoId=${encodeURIComponent(videoId)}&audio=${musicMode ? 1 : 0}`;
 }
 
+let activeObjectUrl = null;
+
+function revokeObjectUrl() {
+  if (activeObjectUrl) {
+    URL.revokeObjectURL(activeObjectUrl);
+    activeObjectUrl = null;
+  }
+}
+
+async function fetchMediaBlob(src) {
+  const res = await fetch(src, { signal: AbortSignal.timeout(300000) });
+  const ct = res.headers.get('content-type') || '';
+
+  if (!res.ok || ct.includes('application/json')) {
+    let msg = `Media server error (${res.status})`;
+    try {
+      const json = await res.json();
+      if (json.error) msg = json.error;
+    } catch {
+      // ignore
+    }
+    throw new Error(msg);
+  }
+
+  const blob = await res.blob();
+  if (!blob.size || blob.type.includes('json')) {
+    throw new Error('Media server returned invalid data');
+  }
+  return blob;
+}
+
+async function loadAsBlob(el, src) {
+  revokeObjectUrl();
+  const blob = await fetchMediaBlob(src);
+  activeObjectUrl = URL.createObjectURL(blob);
+  el.removeAttribute('src');
+  el.src = activeObjectUrl;
+  el.load();
+  await waitForMedia(el);
+}
+
 function waitForMedia(el, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
@@ -31,7 +72,7 @@ function waitForMedia(el, timeoutMs = 120000) {
       cleanup();
       const code = el.error?.code;
       const msg = code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
-        ? 'Format not supported — try Video mode or another track'
+        ? 'Could not decode stream — try Video mode or another track'
         : (el.error?.message || 'Could not load stream');
       reject(new Error(msg));
     };
@@ -109,6 +150,8 @@ export function createPlayer(videoEl, audioEl) {
       other.load();
 
       const el = activeEl();
+      el.crossOrigin = 'anonymous';
+
       const streams = music
         ? streamData.audioStreams || []
         : [...(streamData.videoStreams || []), ...(streamData.audioStreams || [])];
@@ -122,10 +165,15 @@ export function createPlayer(videoEl, audioEl) {
 
       if (mustProxy && videoId) {
         const src = mediaProxyUrl(videoId, music);
-        el.src = src;
-        el.poster = streamData.thumbnailUrl || '';
-        el.load();
-        await waitForMedia(el);
+        if (music) {
+          await loadAsBlob(el, src);
+        } else {
+          revokeObjectUrl();
+          el.src = src;
+          el.poster = streamData.thumbnailUrl || '';
+          el.load();
+          await waitForMedia(el);
+        }
         return { proxied: true };
       }
 
@@ -133,6 +181,7 @@ export function createPlayer(videoEl, audioEl) {
         throw new Error('No playable stream found');
       }
 
+      revokeObjectUrl();
       el.src = stream.url;
       if (!music) el.poster = streamData.thumbnailUrl || '';
       el.load();
@@ -210,6 +259,7 @@ export function createPlayer(videoEl, audioEl) {
     },
 
     destroy() {
+      revokeObjectUrl();
       for (const el of [videoEl, audioEl]) {
         el.pause();
         el.removeAttribute('src');

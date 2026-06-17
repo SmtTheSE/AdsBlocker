@@ -1,5 +1,8 @@
 export const PROXY_STREAMS = '/api/streams';
 
+/** Render media backend — used when Vercel env is missing. */
+export const DEFAULT_MEDIA_BACKEND = 'https://adsblocker-cqaa.onrender.com';
+
 export const YT_ID_RE =
   /(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|live\/|watch\?v=|watch\?.+&v=)|music\.youtube\.com\/watch\?v=)([\w-]{11})/;
 
