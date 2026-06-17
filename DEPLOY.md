@@ -2,16 +2,25 @@
 
 ## Option A — Full stack (recommended for playback)
 
-Deploy the Docker image to **Railway**, **Render**, or **Fly.io**:
+Deploy the Docker image to **Railway**, **Render**, or **Fly.io**.
 
-```bash
-# Railway (install CLI first)
-railway login
-railway init
-railway up
-```
+### Render (dashboard)
 
-The container includes `yt-dlp` for reliable media streaming and disk caching.
+1. [render.com](https://render.com) → **New** → **Web Service** → connect GitHub repo
+2. **Runtime:** Docker | **Health check:** `/api/health`
+3. Optional env vars on Render:
+
+| Name | Value |
+|------|-------|
+| `YTDL_NO_UPDATE` | `1` (silences update-check 403 warnings) |
+| `YTDLP_PLAYER_CLIENT` | `android,web` (default in Dockerfile) |
+
+4. Deploy → copy URL, e.g. `https://adsblocker-cqaa.onrender.com`
+5. Test: `curl https://YOUR-APP.onrender.com/api/health`
+
+The `Error checking for updates: Status code: 403` line in Render logs is **harmless** — the service is still live.
+
+The container installs the **latest yt-dlp** release (not Debian’s old package).
 
 ## Option B — Vercel frontend + media backend
 
