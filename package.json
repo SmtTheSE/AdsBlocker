@@ -2,7 +2,11 @@
   "name": "clearstream",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Ad-free YouTube and music streaming web app",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "node scripts/dev-server.mjs",
     "start": "node scripts/dev-server.mjs",

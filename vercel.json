@@ -1,16 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "",
-  "outputDirectory": ".",
   "functions": {
-    "api/media.js": {
-      "maxDuration": 60
-    },
-    "api/streams.js": {
-      "maxDuration": 30
-    },
-    "api/cache/warm.js": {
-      "maxDuration": 10
+    "api/**/*.js": {
+      "maxDuration": 10,
+      "includeFiles": "lib/**"
     }
   },
   "headers": [

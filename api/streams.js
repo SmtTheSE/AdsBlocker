@@ -33,6 +33,7 @@ export default async function handler(req, res) {
 
     return res.status(400).json({ error: 'Provide videoId or q parameter' });
   } catch (err) {
+    console.error('streams API error:', err);
     return res.status(500).json({ error: err.message || 'Server error' });
   }
 }
