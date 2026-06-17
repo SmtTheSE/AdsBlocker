@@ -17,6 +17,10 @@ export async function prefetchMedia(videoId, musicMode = true) {
 
   prefetching.add(key);
   try {
+    const { isServerlessMode, detectServerless } = await import('./api.js');
+    await detectServerless();
+    if (isServerlessMode()) return false;
+
     const res = await fetch(warmUrl(videoId, musicMode));
     return res.ok;
   } catch {

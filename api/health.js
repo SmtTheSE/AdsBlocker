@@ -8,10 +8,11 @@ export default async function handler(req, res) {
     ok: true,
     backend: isServerless ? 'vercel-serverless' : 'youtube-direct+yt-dlp+cache',
     runtime: runtimeLabel(),
-    version: 6,
+    version: 7,
     features: {
       diskCache: canUseDiskCache(),
       ytDlp: canUseYtDlp(),
+      mediaBackend: Boolean(process.env.MEDIA_BACKEND_URL),
     },
   });
 }

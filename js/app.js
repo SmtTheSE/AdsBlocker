@@ -1,5 +1,5 @@
 import { extractVideoId, formatDuration } from './config.js';
-import { getStreams, searchVideos, searchMusic, getActiveInstance, getActiveSource } from './api.js';
+import { getStreams, searchVideos, searchMusic, getActiveInstance, getActiveSource, detectServerless } from './api.js';
 import * as queue from './queue.js';
 import { createPlayer } from './player.js';
 import { initInstallUI, parseIncomingLink, initMediaSession, isStandalone } from './install.js';
@@ -309,7 +309,11 @@ async function loadAndPlay(item, { addToQueueFirst = false, queueRest = false, r
     setStatus('playing', musicMode ? 'Playing · auto-queue on' : 'Playing video');
   } catch (err) {
     setStatus('error', 'Failed to load');
-    toast(err.message || 'Could not play — try another track');
+    const msg = err.message || 'Could not play — try another track';
+    const hint = msg.includes('MEDIA_BACKEND_URL')
+      ? 'Set MEDIA_BACKEND_URL on Vercel to your Docker backend (see DEPLOY.md)'
+      : msg;
+    toast(hint);
     console.error('Playback failed:', err);
     persistSession(false);
   } finally {
@@ -508,6 +512,8 @@ document.querySelectorAll('[data-search]').forEach((btn) => {
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('/sw.js').catch(() => {});
 }
+
+detectServerless().catch(() => {});
 
 initInstallUI();
 mediaSessionCtl = initMediaSession(player, () => currentMeta);

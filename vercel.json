@@ -4,6 +4,10 @@
     "api/**/*.js": {
       "maxDuration": 10,
       "includeFiles": "lib/**"
+    },
+    "api/cache/**/*.js": {
+      "maxDuration": 10,
+      "includeFiles": "lib/**"
     }
   },
   "headers": [
